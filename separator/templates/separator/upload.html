@@ -1,0 +1,281 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Splitter Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Reset e Estilos Globais --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f2f5 0%, #e2e6ea 100%);
+            color: #1d1d1f;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 20px;
+        }
+
+        /* --- O Card Principal --- */
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 50px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            width: 100%; max-width: 500px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .main-card:hover { transform: translateY(-3px); }
+
+        h1 { font-weight: 700; font-size: 2.2rem; margin-bottom: 10px; letter-spacing: -0.5px; }
+        .gradient-text {
+            background: linear-gradient(90deg, #007aff, #5856d6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        p.subtitle { color: #86868b; margin-bottom: 40px; font-size: 1.1rem; }
+
+        /* --- Estilizando o Formulário do Django --- */
+        form { text-align: left; }
+        form p { margin-bottom: 25px; }
+        form label { display: block; font-weight: 600; margin-bottom: 8px; color: #424245; font-size: 0.95rem; }
+        
+        form input[type="text"] {
+            width: 100%; padding: 14px 16px;
+            border: 1px solid #d2d2d7; border-radius: 12px;
+            font-size: 1rem; background: #fafafa; transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+        form input[type="text"]:focus {
+            outline: none; border-color: #007aff; background: #fff;
+            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+        }
+        form input[type="file"] {
+            width: 100%; padding: 10px; background: #fafafa;
+            border: 1px dashed #d2d2d7; border-radius: 12px; cursor: pointer;
+        }
+
+        /* --- Botão Principal --- */
+        .btn-hero {
+            width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 600; color: white; border: none;
+            border-radius: 14px; cursor: pointer; margin-top: 10px;
+            background: linear-gradient(135deg, #007aff, #5856d6);
+            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        .btn-hero:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 122, 255, 0.4); }
+        .btn-hero:active { transform: scale(0.98); }
+        .btn-hero:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+        /* --- Modal "Glassmorphism" --- */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            justify-content: center; align-items: center; z-index: 100;
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 40px; border-radius: 24px; text-align: center;
+            width: 90%; max-width: 420px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            transform: scale(0.9); transition: transform 0.3s ease;
+            max-height: 90vh; overflow-y: auto; /* Para não bugar telas menores */
+        }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+
+        .modal-icon { font-size: 3rem; margin-bottom: 20px; }
+        .status-badge {
+            display: inline-block; padding: 6px 12px; background: #e3f2fd;
+            color: #007aff; border-radius: 20px; font-weight: 600; font-size: 0.9rem; margin-top: 10px;
+        }
+        
+        /* O cronômetro precisa ter fontes de largura fixa para não tremer */
+        .timer-display {
+            font-size: 2.5rem; font-weight: 700; color: #007aff; 
+            margin: 15px 0; font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="main-card">
+        <h1>Audio Splitter <span class="gradient-text">Pro</span></h1>
+        <p class="subtitle">Isole faixas de guitarra, bateria e voz com IA profissional.</p>
+
+        <form id="uploadForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn-hero" id="submitBtn">Processar Áudio</button>
+        </form>
+    </div>
+
+    <div id="statusModal" class="modal-overlay">
+        <div class="modal-content" id="modalContentInner">
+            <div class="modal-icon">🎵</div>
+            <h3 style="font-size: 1.5rem; margin-bottom: 10px;">Upload Recebido!</h3>
+            <p style="color: #86868b; margin-bottom: 20px;">A sua música <strong id="modalTitle"></strong> está sendo processada.</p>
+            
+            <div style="margin-bottom: 15px;">
+                Status: <span id="modalStatus" class="status-badge">Pendente</span>
+            </div>
+            
+            <div id="timerContainer"></div>
+            
+            <button class="btn-hero" id="fecharBtn" style="padding: 12px; font-size: 1rem; background: #e2e6ea; color: #1d1d1f; box-shadow: none; margin-top: 20px;" onclick="fecharModal()">Fechar</button>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const modalOverlay = document.getElementById('statusModal');
+        const submitBtn = document.getElementById('submitBtn');
+        const modalContentInner = document.getElementById('modalContentInner');
+        
+        let timerInterval;
+        let pollingInterval;
+        let segundos = 0;
+
+        // Animação de entrada dos campos (Mantida do original)
+        document.addEventListener("DOMContentLoaded", () => {
+            const formFields = document.querySelectorAll('form p');
+            formFields.forEach((field, index) => {
+                field.style.opacity = 0;
+                field.style.transform = 'translateY(20px)';
+                field.style.transition = `all 0.5s ease ${index * 0.1}s`;
+                setTimeout(() => {
+                    field.style.opacity = 1;
+                    field.style.transform = 'translateY(0)';
+                }, 100);
+            });
+        });
+
+        // Formata o tempo para MM:SS
+        function formatarTempo(segs) {
+            const min = Math.floor(segs / 60).toString().padStart(2, '0');
+            const s = (segs % 60).toString().padStart(2, '0');
+            return `${min}:${s}`;
+        }
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            submitBtn.innerHTML = "Enviando <span>.</span><span>.</span><span>.</span>";
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = 0.8;
+
+            const formData = new FormData(form);
+
+            fetch("{% url 'upload_audio' %}", {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    // Configura textos iniciais
+                    document.getElementById('modalTitle').innerText = data.title;
+                    document.getElementById('modalStatus').innerText = data.status;
+                    
+                    // Inicia cronômetro
+                    segundos = 0;
+                    document.getElementById('timerContainer').innerHTML = `<div class="timer-display" id="timerDisplay">00:00</div>`;
+                    
+                    timerInterval = setInterval(() => {
+                        segundos++;
+                        document.getElementById('timerDisplay').innerText = formatarTempo(segundos);
+                    }, 1000);
+
+                    // Ativa o modal e começa a consultar o status
+                    modalOverlay.classList.add('active');
+                    iniciarPolling(data.separation_id);
+                    form.reset();
+                } else {
+                    alert("Erro ao enviar o arquivo. Verifique os formatos.");
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert("Ocorreu um erro na comunicação com o servidor.");
+            })
+            .finally(() => {
+                submitBtn.innerText = "Processar Áudio";
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = 1;
+            });
+        });
+
+        function iniciarPolling(separationId) {
+            pollingInterval = setInterval(() => {
+                fetch(`/status/${separationId}/`)
+                .then(res => res.json())
+                .then(data => {
+                    const statusBadge = document.getElementById('modalStatus');
+                    if (statusBadge) statusBadge.innerText = data.status_display;
+                    
+                    if (data.status === 'COMPLETED') {
+                        clearInterval(timerInterval);
+                        clearInterval(pollingInterval);
+                        mostrarPainelDeDownloads(separationId, data.files);
+                    } else if (data.status === 'FAILED') {
+                        clearInterval(timerInterval);
+                        clearInterval(pollingInterval);
+                        if (statusBadge) {
+                            statusBadge.innerText = "Erro no Processamento";
+                            statusBadge.style.background = "#ffebee";
+                            statusBadge.style.color = "#d32f2f";
+                        }
+                    }
+                });
+            }, 3000);
+        }
+
+        function mostrarPainelDeDownloads(separationId, files) {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            let html = `
+                <div class="modal-icon">🎧</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 10px;">Concluído em ${formatarTempo(segundos)}!</h3>
+                <p style="color: #86868b; margin-bottom: 20px; font-size: 0.95rem;">Baixe as faixas isoladas ou crie a sua backing track personalizada.</p>
+                
+                <div style="text-align: left; background: rgba(0,0,0,0.03); padding: 15px; border-radius: 16px; margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 12px; color: #1d1d1f; font-size: 1rem;">Faixas Individuais</h4>
+                    <a href="${files.vocals}" download class="status-badge" style="display:block; text-align:center; text-decoration:none; margin-bottom:8px; background: #fff; border: 1px solid #e2e6ea; color: #1d1d1f; padding: 10px;">🎤 Baixar Voz</a>
+                    <a href="${files.drums}" download class="status-badge" style="display:block; text-align:center; text-decoration:none; margin-bottom:8px; background: #fff; border: 1px solid #e2e6ea; color: #1d1d1f; padding: 10px;">🥁 Baixar Bateria</a>
+                    <a href="${files.bass}" download class="status-badge" style="display:block; text-align:center; text-decoration:none; margin-bottom:8px; background: #fff; border: 1px solid #e2e6ea; color: #1d1d1f; padding: 10px;">🎸 Baixar Baixo</a>
+                    <a href="${files.guitar}" download class="status-badge" style="display:block; text-align:center; text-decoration:none; margin-bottom:8px; background: #fff; border: 1px solid #e2e6ea; color: #1d1d1f; padding: 10px;">🎸 Baixar Guitarra</a>
+                    <a href="${files.piano}" download class="status-badge" style="display:block; text-align:center; text-decoration:none; margin-bottom:8px; background: #fff; border: 1px solid #e2e6ea; color: #1d1d1f; padding: 10px;">🎹 Baixar Piano/Teclados</a>
+                    <a href="${files.other}" download class="status-badge" style="display:block; text-align:center; text-decoration:none; margin-bottom:4px; background: #fff; border: 1px solid #e2e6ea; color: #1d1d1f; padding: 10px;">🔊 Baixar Outros (Ambiental)</a>
+                </div>
+
+                <form action="/mix/${separationId}/" method="POST" style="text-align: left; background: #e3f2fd; padding: 15px; border-radius: 16px;">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                    <h4 style="margin-bottom: 8px; color: #007aff; font-size: 1rem;">Gerar Backing Track MP3</h4>
+                    <p style="font-size: 0.85rem; color: #555; margin-bottom: 15px;">Selecione o que deseja juntar:</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.95rem; font-weight: 500;"><input type="checkbox" name="tracks" value="vocals"> Voz</label>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.95rem; font-weight: 500;"><input type="checkbox" name="tracks" value="drums" checked> Bateria</label>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.95rem; font-weight: 500;"><input type="checkbox" name="tracks" value="bass" checked> Baixo</label>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.95rem; font-weight: 500;"><input type="checkbox" name="tracks" value="guitar"> Guitarra</label>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.95rem; font-weight: 500;"><input type="checkbox" name="tracks" value="piano"> Piano/Teclados</label>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:8px; font-size:0.95rem; font-weight: 500;"><input type="checkbox" name="tracks" value="other"> Outros</label>
+                    </div>
+                    
+                    <button type="submit" class="btn-hero" style="padding: 12px; font-size: 1rem; border-radius: 12px; margin-top: 0;">Mixar e Baixar</button>
+                </form>
+                
+                <button class="btn-hero" style="padding: 12px; font-size: 1rem; background: #e2e6ea; color: #1d1d1f; box-shadow: none; margin-top: 15px;" onclick="location.reload()">Fazer Nova Música</button>
+            `;
+            
+            modalContentInner.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

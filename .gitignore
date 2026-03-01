@@ -1,0 +1,24 @@
+# Ambientes Virtuais
+venv/
+env/
+.env
+
+# Banco de dados local (não é bom subir pro GitHub)
+db.sqlite3
+
+# Arquivos temporários e de cache do Python/Django
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+celerybeat-schedule
+*.log
+
+# Pastas de Uploads e Áudios gerados
+media/
+uploads/
+temp_youtube_audio/
+
+# Modelos de IA baixados (Cache do PyTorch e Demucs)
+.cache/

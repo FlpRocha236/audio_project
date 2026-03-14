@@ -53,12 +53,11 @@ Um ecossistema web avançado para músicos e produtores musicais. O **Audio Spli
 ### Instalação
 
 1. Clone este repositório:
+
    ```bash
    git clone [https://github.com/FlpRocha236/audio_project.git](https://github.com/FlpRocha236/audio_project.git)
    cd audio_project
    ```
-
-
 2. Crie e ative o ambiente virtual:
    **Bash**
 

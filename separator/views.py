@@ -1,104 +1,145 @@
 import os
+import json
 from django.shortcuts import render
 from django.http import JsonResponse, FileResponse
-from .forms import AudioUploadForm
-from .models import AudioSeparation
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from pydub import AudioSegment
 
-# IMPORTANTE: Importando a tarefa do Celery que criamos
+from .forms import AudioUploadForm
+from .models import AudioSeparation
 from .tasks import process_audio_task
 
-AudioSegment.converter = r"C:\ffmpeg\bin\ffmpeg.exe"
+# FFmpeg via settings (não mais hardcoded)
+if hasattr(settings, 'FFMPEG_PATH') and settings.FFMPEG_PATH != 'ffmpeg':
+    AudioSegment.converter = settings.FFMPEG_PATH
 
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
 def upload_audio(request):
+    """
+    POST — recebe o arquivo de áudio (multipart/form-data) e dispara o Celery
+    GET  — retorna status 200 para healthcheck
+    """
     if request.method == 'POST':
         form = AudioUploadForm(request.POST, request.FILES)
         if form.is_valid():
             separation = form.save()
-            
-            # O GATILHO: Dispara a música para a fila do Celery trabalhar em segundo plano!
             process_audio_task.delay(separation.id)
-            
-            # Devolvemos um JSON de sucesso com os dados do áudio
+
             return JsonResponse({
                 'success': True,
                 'separation_id': separation.id,
                 'title': separation.title,
-                'status': separation.get_status_display()
-            })
-        else:
-            # Se houver erro de validação (ex: arquivo não suportado)
-            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
-            
-    # Se for GET, apenas renderiza a página vazia
-    form = AudioUploadForm()
-    return render(request, 'separator/upload.html', {'form': form})
+                'status': separation.status,
+                'status_display': separation.get_status_display(),
+            }, status=201)
+
+        return JsonResponse({
+            'success': False,
+            'errors': form.errors
+        }, status=400)
+
+    # GET — healthcheck
+    return JsonResponse({'status': 'Audio Splitter API online'})
 
 
+@require_http_methods(["GET"])
 def check_status(request, separation_id):
+    """
+    GET — retorna o status atual do processamento.
+    Quando COMPLETED, inclui as URLs de cada stem e dos arquivos MIDI.
+    """
     try:
         track = AudioSeparation.objects.get(id=separation_id)
-        data = {
-            'status': track.status,
-            'status_display': track.get_status_display()
-        }
-        
-        if track.status == 'COMPLETED':
-            data['files'] = {
-                'vocals': track.vocals_file.url if track.vocals_file else '',
-                'drums': track.drums_file.url if track.drums_file else '',
-                'bass': track.bass_file.url if track.bass_file else '',
-                # ADICIONADOS PARA O MODELO 6S
-                'guitar': track.guitar_file.url if track.guitar_file else '',
-                'piano': track.piano_file.url if track.piano_file else '',
-                'other': track.other_file.url if track.other_file else '',
-            }
-        return JsonResponse(data)
     except AudioSeparation.DoesNotExist:
-        return JsonResponse({'error': 'Não encontrado'}, status=404)
+        return JsonResponse({'error': 'Separação não encontrada'}, status=404)
 
+    data = {
+        'separation_id': track.id,
+        'title': track.title,
+        'status': track.status,
+        'status_display': track.get_status_display(),
+    }
 
-def mix_and_download(request, separation_id):
-    """ View que recebe as faixas desejadas, junta tudo e faz o download """
-    if request.method == 'POST':
-        track = AudioSeparation.objects.get(id=separation_id)
-        
-        # Pega as faixas que o usuário marcou no frontend
-        selected_tracks = request.POST.getlist('tracks') # ex: ['drums', 'bass']
-        
-        if not selected_tracks:
-            return JsonResponse({'error': 'Nenhuma faixa selecionada'}, status=400)
+    if track.status == 'COMPLETED':
+        base = request.build_absolute_uri('/')[:-1]  # ex: https://api.railway.app
 
-        # Mapeia as opções para os caminhos reais dos arquivos
-        file_map = {
-            'vocals': track.vocals_file.path if track.vocals_file else None,
-            'drums': track.drums_file.path if track.drums_file else None,
-            'bass': track.bass_file.path if track.bass_file else None,
-            'guitar': track.guitar_file.path if track.guitar_file else None,
-            'piano': track.piano_file.path if track.piano_file else None,
-            'other': track.other_file.path if track.other_file else None,
+        def url(field):
+            return base + field.url if field else None
+
+        data['stems'] = {
+            'vocals': url(track.vocals_file),
+            'drums':  url(track.drums_file),
+            'bass':   url(track.bass_file),
+            'guitar': url(track.guitar_file),
+            'piano':  url(track.piano_file),
+            'other':  url(track.other_file),
         }
 
-        mixed_audio = None
-        
-        # Junta (faz o overlay) de cada faixa selecionada
-        for t in selected_tracks:
-            path = file_map.get(t)
-            if path and os.path.exists(path):
-                segment = AudioSegment.from_file(path)
-                if mixed_audio is None:
-                    mixed_audio = segment
-                else:
-                    mixed_audio = mixed_audio.overlay(segment)
+    if track.status == 'FAILED':
+        data['error_message'] = 'Ocorreu um erro durante o processamento.'
 
-        if mixed_audio:
-            # Salva o arquivo final temporariamente
-            output_filename = f"custom_mix_{track.title}.mp3"
-            output_path = os.path.join(settings.MEDIA_ROOT, 'uploads', output_filename)
-            mixed_audio.export(output_path, format="mp3", bitrate="192k")
-            
-            # Retorna o arquivo para download
-            return FileResponse(open(output_path, 'rb'), as_attachment=True, filename=output_filename)
+    return JsonResponse(data)
 
-    return JsonResponse({'error': 'Método inválido'}, status=400)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def mix_and_download(request, separation_id):
+    """
+    POST — recebe lista de stems via JSON e retorna o arquivo mixado para download.
+    Body: { "tracks": ["drums", "bass", "guitar"] }
+    """
+    try:
+        track = AudioSeparation.objects.get(id=separation_id)
+    except AudioSeparation.DoesNotExist:
+        return JsonResponse({'error': 'Separação não encontrada'}, status=404)
+
+    if track.status != 'COMPLETED':
+        return JsonResponse({'error': 'Processamento ainda não concluído'}, status=400)
+
+    # Aceita tanto JSON quanto form-data
+    try:
+        body = json.loads(request.body)
+        selected_tracks = body.get('tracks', [])
+    except (json.JSONDecodeError, AttributeError):
+        selected_tracks = request.POST.getlist('tracks')
+
+    if not selected_tracks:
+        return JsonResponse({'error': 'Nenhuma faixa selecionada'}, status=400)
+
+    file_map = {
+        'vocals': track.vocals_file.path if track.vocals_file else None,
+        'drums':  track.drums_file.path  if track.drums_file  else None,
+        'bass':   track.bass_file.path   if track.bass_file   else None,
+        'guitar': track.guitar_file.path if track.guitar_file else None,
+        'piano':  track.piano_file.path  if track.piano_file  else None,
+        'other':  track.other_file.path  if track.other_file  else None,
+    }
+
+    mixed_audio = None
+    for stem in selected_tracks:
+        path = file_map.get(stem)
+        if path and os.path.exists(path):
+            segment = AudioSegment.from_file(path)
+            mixed_audio = segment if mixed_audio is None else mixed_audio.overlay(segment)
+
+    if not mixed_audio:
+        return JsonResponse({'error': 'Nenhum arquivo de faixa encontrado'}, status=400)
+
+    # Salva o mix temporariamente e retorna para download
+    safe_title = "".join(c for c in track.title if c.isalnum() or c in (' ', '-', '_')).strip()
+    output_filename = f"mix_{safe_title or track.id}.mp3"
+    output_path = os.path.join(settings.MEDIA_ROOT, 'uploads', output_filename)
+
+    mixed_audio.export(output_path, format='mp3', bitrate='192k')
+
+    response = FileResponse(
+        open(output_path, 'rb'),
+        as_attachment=True,
+        filename=output_filename,
+        content_type='audio/mpeg'
+    )
+    return response

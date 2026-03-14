@@ -3,7 +3,7 @@ venv/
 env/
 .env
 
-# Banco de dados local (não é bom subir pro GitHub)
+# Banco de dados local
 db.sqlite3
 
 # Arquivos temporários e de cache do Python/Django
@@ -22,3 +22,28 @@ temp_youtube_audio/
 
 # Modelos de IA baixados (Cache do PyTorch e Demucs)
 .cache/
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos de build e deploy
+staticfiles/
+*.egg-info/
+dist/
+build/
+
+# Variáveis de ambiente (nunca subir!)
+.env
+.env.local
+.env.production
+
+# Celery
+celerybeat.pid
+celerybeat-schedule.db

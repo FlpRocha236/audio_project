@@ -1,123 +1,188 @@
-# 🎧 Audio Splitter Pro
+# 🎧 Audio Splitter Pro — Backend
 
-Um ecossistema web avançado para músicos e produtores musicais. O **Audio Splitter Pro** utiliza Inteligência Artificial de ponta para separar músicas em 6 faixas isoladas (stems) e gerar arquivos MIDI automaticamente a partir do áudio, além de permitir o download direto do YouTube e mixagem de *Backing Tracks* em tempo real.
+> REST API Django para separação de stems de áudio via IA
 
-![Python](https://img.shields.io/badge/Python-3.13-blue)
-![Django](https://img.shields.io/badge/Django-092E20?style=flat&logo=django&logoColor=white)
-![Celery](https://img.shields.io/badge/Celery-37814A?style=flat&logo=celery&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white)
-![AI](https://img.shields.io/badge/AI-Demucs_&_Basic_Pitch-FF6F00)
-
----
-
-## ✨ Funcionalidades Principais
-
-* **Separação Multifaixas (6 Stems):** Utiliza o modelo de IA `htdemucs_6s` da Meta para isolar o áudio em: *Voz, Bateria, Baixo, Guitarra, Piano e Outros/SFX*.
-* **Conversão de Áudio para MIDI:** Integração com a rede neural `basic-pitch` do Spotify para transcrever as faixas isoladas (Baixo, Guitarra, Piano, Voz) em arquivos `.mid`, permitindo a leitura em softwares como Guitar Pro e MuseScore.
-* **Integração com YouTube:** Cole o link de um vídeo e o servidor baixa o áudio automaticamente (`yt-dlp`) para processamento.
-* **Mixer de Backing Tracks:** Interface para o usuário selecionar quais instrumentos deseja manter e gerar um novo arquivo MP3 mixado na hora (via `pydub`).
-* **Processamento Assíncrono:** Fila de tarefas em segundo plano garantindo que a interface (UI) não trave enquanto a IA processa o áudio. Status atualizado em tempo real no frontend via polling.
-* **UI/UX Premium:** Interface limpa, responsiva e moderna com design Glassmorphism estilo macOS.
+[![Python](https://img.shields.io/badge/Python-3.13-blue?style=flat&logo=python)](https://python.org/)
+[![Django](https://img.shields.io/badge/Django-6.0-092E20?style=flat&logo=django&logoColor=white)](https://djangoproject.com/)
+[![Celery](https://img.shields.io/badge/Celery-5.6-37814A?style=flat&logo=celery&logoColor=white)](https://docs.celeryq.dev/)
+[![Redis](https://img.shields.io/badge/Redis-7.3-DC382D?style=flat&logo=redis&logoColor=white)](https://redis.io/)
+[![AI](https://img.shields.io/badge/AI-Demucs_htdemucs__6s-FF6F00?style=flat)](https://github.com/facebookresearch/demucs)
 
 ---
 
-## 🛠️ Tecnologias e Arquitetura
+## ✨ Funcionalidades
 
-**Backend:**
-
-* **Django:** Framework principal e roteamento.
-* **Celery:** Worker para processamento das filas assíncronas de IA.
-* **Redis (Memurai no Windows):** Broker de mensagens para o Celery.
-* **PyDub & FFmpeg:** Manipulação, corte e exportação de áudio.
-* **yt-dlp:** Extração de áudio do YouTube.
-
-**Inteligência Artificial:**
-
-* **Demucs (Hybrid Transformer):** Separação de fontes de áudio.
-* **Basic-Pitch:** Transcrição de áudio para notas MIDI.
-
-**Frontend:**
-
-* HTML5, CSS3 avançado, Vanilla JavaScript (Fetch API para polling de status).
+* **Separação em 6 Stems** — modelo `htdemucs_6s` da Meta: Voz, Bateria, Baixo, Guitarra, Piano e Outros
+* **Processamento Assíncrono** — filas Celery + Redis para não bloquear o servidor durante o processamento de IA
+* **Mixer de Backing Tracks** — selecione quais stems manter e gere um MP3 mixado via pydub
+* **Download do YouTube** — cole um link e o servidor extrai o áudio automaticamente via yt-dlp
+* **REST API completa** — endpoints JSON com CORS configurado para consumo pelo frontend Angular
+* **Documentação clara** — respostas padronizadas com status, URLs e tratamento de erros
 
 ---
 
-## 🚀 Como Executar o Projeto Localmente
+## 🛠️ Stack
+
+```
+Python 3.13 · Django 6.0 · Celery 5.6 · Redis · Demucs · pydub · yt-dlp · FFmpeg
+```
+
+---
+
+## 📡 Endpoints da API
+
+| Método  | Endpoint              | Descrição                                |
+| -------- | --------------------- | ------------------------------------------ |
+| `GET`  | `/api/upload/`      | Healthcheck da API                         |
+| `POST` | `/api/upload/`      | Envia arquivo de áudio para processamento |
+| `GET`  | `/api/status/{id}/` | Verifica status e retorna URLs dos stems   |
+| `POST` | `/api/mix/{id}/`    | Gera e baixa mix com stems selecionados    |
+
+### Exemplos
+
+**POST /api/upload/**
+
+```
+Content-Type: multipart/form-data
+Body: title="Charlie Brown Jr", original_audio=<arquivo.mp3>
+```
+
+```json
+{
+  "success": true,
+  "separation_id": 10,
+  "title": "Charlie Brown Jr",
+  "status": "PENDING"
+}
+```
+
+**GET /api/status/10/**
+
+```json
+{
+  "separation_id": 10,
+  "status": "COMPLETED",
+  "stems": {
+    "vocals": "http://localhost:8000/media/...",
+    "drums":  "http://localhost:8000/media/...",
+    "bass":   "http://localhost:8000/media/...",
+    "guitar": "http://localhost:8000/media/...",
+    "piano":  "http://localhost:8000/media/...",
+    "other":  "http://localhost:8000/media/..."
+  }
+}
+```
+
+**POST /api/mix/10/**
+
+```json
+{ "tracks": ["drums", "bass", "guitar"] }
+```
+
+Retorna arquivo `.mp3` para download direto.
+
+---
+
+## 🚀 Como Executar Localmente
 
 ### Pré-requisitos
 
-1. **Python 3.13+** instalado.
-2. **FFmpeg (Shared Build):** É obrigatório ter a versão "Shared" do FFmpeg (que contém os arquivos `.dll` ou `.so`) configurada nas Variáveis de Ambiente (`PATH`) do sistema operacional para o `torchcodec` exportar os áudios corretamente.
-3. **Servidor Redis:** No Linux/Mac (`sudo apt install redis` ou `brew install redis`). No Windows, utilize o [Memurai](https://www.memurai.com/).
+1. **Python 3.13+**
+2. **FFmpeg (Shared Build)** configurado no PATH do sistema
+3. **Redis** — Linux/Mac: `sudo apt install redis` · Windows: [Memurai](https://www.memurai.com/)
 
 ### Instalação
 
-1. Clone este repositório:
+```bash
+git clone https://github.com/FlpRocha236/audio_project.git
+cd audio_project
 
-   ```bash
-   git clone [https://github.com/FlpRocha236/audio_project.git](https://github.com/FlpRocha236/audio_project.git)
-   cd audio_project
-   ```
-2. Crie e ative o ambiente virtual:
-   **Bash**
+python -m venv venv
+# Windows:
+.\venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
 
-   ```
-   python -m venv venv
-   # No Windows:
-   venv\Scripts\activate
-   # No Linux/Mac:
-   source venv/bin/activate
-   ```
-3. Instale as dependências:
-   **Bash**
+pip install -r requirements.txt
 
-   ```
-   pip install -r requirements.txt
-   ```
+python manage.py makemigrations
+python manage.py migrate
+```
 
-   *(Nota: O modelo Demucs e o Basic-Pitch instalarão o PyTorch automaticamente. A primeira execução baixará os modelos de IA, o que pode levar alguns minutos).*
-4. Aplique as migrações do banco de dados:
-   **Bash**
+### Variáveis de ambiente
 
-   ```
-   python manage.py makemigrations
-   python manage.py migrate
-   ```
+Cria um arquivo `.env` na raiz do projeto:
 
----
+```env
+SECRET_KEY=sua-chave-secreta-aqui
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:4200
+FFMPEG_PATH=C:\ffmpeg\bin\ffmpeg.exe
+REDIS_URL=redis://localhost:6379/0
+```
 
-## ⚙️ Iniciando os Motores
+### Iniciando os serviços
 
-Para o sistema funcionar com o processamento em segundo plano, você precisará de **3 terminais** abertos simultaneamente:
+Você precisará de **3 terminais** simultâneos:
 
-**Terminal 1: O Broker de Mensagens**
+```bash
+# Terminal 1 — Redis (Memurai no Windows)
+# Garanta que está rodando na porta 6379
 
-* Garanta que o servidor do Redis (ou Memurai) esteja rodando na porta `6379`.
+# Terminal 2 — Celery Worker
+celery -A audio_project worker -l info --pool=solo
 
-**Terminal 2: O Worker (Celery)**
+# Terminal 3 — Django
+python manage.py runserver
+```
 
-* Com o ambiente virtual ativado, inicie o trabalhador que executará a IA:
-  **Bash**
-
-  ```
-  celery -A audio_project worker -l info --pool=solo
-  ```
-
-  *(A flag `--pool=solo` é altamente recomendada para ambientes Windows).*
-
-**Terminal 3: O Servidor Django**
-
-* Com o ambiente virtual ativado, inicie a aplicação web:
-  **Bash**
-
-  ```
-  python manage.py runserver
-  ```
-
-Acesse `http://127.0.0.1:8000` no seu navegador e comece a isolar suas faixas!
+Acesse `http://localhost:8000/api/upload/` — deve retornar `{"status": "Audio Splitter API online"}`.
 
 ---
 
-## 📝 Notas sobre a IA
+## 🏗️ Arquitetura
 
-* A primeira vez que o Celery receber uma música, ele fará o download dos modelos de rede neural da Meta e do Spotify (aprox. 150MB no total). As execuções subsequentes usarão o cache local, sendo significativamente mais rápidas.
+```
+audio_project/
+├── audio_project/
+│   ├── settings.py     → configurações com python-decouple e CORS
+│   ├── urls.py         → rotas principais com prefixo /api/
+│   └── celery.py       → configuração do Celery
+└── separator/
+    ├── models.py       → AudioSeparation com 6 FileFields de stems
+    ├── views.py        → upload, check_status, mix_and_download
+    ├── tasks.py        → process_audio_task (Celery + Demucs)
+    ├── forms.py        → AudioUploadForm
+    └── urls.py         → rotas da API
+```
+
+---
+
+## 📝 Observações
+
+* **Primeira execução** : o Demucs baixa os modelos da Meta (~150MB). As execuções seguintes usam cache local e são bem mais rápidas.
+* **basic-pitch (MIDI)** : incompatível com Python 3.13 no momento — requer TensorFlow que ainda não tem suporte oficial. Funcionalidade temporariamente desativada.
+* **Windows** : use `--pool=solo` no Celery para evitar problemas de multiprocessing.
+
+---
+
+## 🔗 Frontend
+
+O frontend Angular que consome esta API está em:
+**[github.com/FlpRocha236/audio-splitter-frontend](https://github.com/FlpRocha236/audio-splitter-frontend)**
+
+---
+
+## 👨‍💻 Autor
+
+**Felipe Rocha** · Junior Back-End Developer
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Felipe_Rocha-0077B5?style=flat&logo=linkedin)](https://www.linkedin.com/in/felipe-rafael-rocha-4b4081245/)
+[![GitHub](https://img.shields.io/badge/GitHub-FlpRocha236-181717?style=flat&logo=github)](https://github.com/FlpRocha236)
+
+---
+
+## 📄 Licença
+
+MIT License

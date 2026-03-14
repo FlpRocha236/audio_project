@@ -53,11 +53,12 @@ def process_audio_task(separation_id):
         os.makedirs(output_dir, exist_ok=True)
 
         command = [
-            "python", "-m", "demucs",
+            "/app/.venv/bin/python", "-m", "demucs",
             "-n", "htdemucs_6s",
             "--out", output_dir,
             input_path
         ]
+        
         subprocess.run(command, check=True)
 
         base_filename = os.path.splitext(os.path.basename(input_path))[0]

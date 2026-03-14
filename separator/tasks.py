@@ -53,7 +53,7 @@ def process_audio_task(separation_id):
         os.makedirs(output_dir, exist_ok=True)
 
         command = [
-            "demucs",
+            "python", "-m", "demucs",
             "-n", "htdemucs_6s",
             "--out", output_dir,
             input_path

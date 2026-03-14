@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 from celery import shared_task
 from django.conf import settings
@@ -6,12 +7,8 @@ from .models import AudioSeparation
 
 
 def download_youtube_audio(youtube_url: str, output_path: str) -> str:
-    """
-    Baixa o áudio de um link do YouTube via yt-dlp.
-    Retorna o caminho do arquivo baixado.
-    """
     command = [
-        "yt-dlp",
+        sys.executable, "-m", "yt_dlp",
         "--extract-audio",
         "--audio-format", "mp3",
         "--audio-quality", "0",
@@ -30,7 +27,6 @@ def process_audio_task(separation_id):
         track.status = 'PROCESSING'
         track.save()
 
-        # Se veio de YouTube, baixa o áudio primeiro
         if track.youtube_url:
             originals_dir = os.path.join(settings.MEDIA_ROOT, 'uploads/originals')
             os.makedirs(originals_dir, exist_ok=True)
@@ -43,7 +39,6 @@ def process_audio_task(separation_id):
             output_path = os.path.join(originals_dir, f"{safe_title}.mp3")
             download_youtube_audio(track.youtube_url, output_path)
 
-            # Atualiza o campo original_audio com o arquivo baixado
             relative_path = os.path.relpath(output_path, settings.MEDIA_ROOT)
             track.original_audio.name = relative_path
             track.save()
@@ -52,14 +47,15 @@ def process_audio_task(separation_id):
         output_dir = os.path.join(settings.MEDIA_ROOT, 'uploads/separated')
         os.makedirs(output_dir, exist_ok=True)
 
-        command = [
-            "/app/.venv/bin/python", "-m", "demucs",
+        # Usa a API Python do demucs diretamente — evita problemas de PATH
+        from demucs.separate import main as demucs_main
+        sys.argv = [
+            "demucs",
             "-n", "htdemucs_6s",
             "--out", output_dir,
             input_path
         ]
-        
-        subprocess.run(command, check=True)
+        demucs_main()
 
         base_filename = os.path.splitext(os.path.basename(input_path))[0]
         demucs_folder = f"uploads/separated/htdemucs_6s/{base_filename}"

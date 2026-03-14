@@ -1,6 +1,5 @@
 import os
 import json
-from django.shortcuts import render
 from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -11,7 +10,6 @@ from .forms import AudioUploadForm
 from .models import AudioSeparation
 from .tasks import process_audio_task
 
-# FFmpeg via settings (não mais hardcoded)
 if hasattr(settings, 'FFMPEG_PATH') and settings.FFMPEG_PATH != 'ffmpeg':
     AudioSegment.converter = settings.FFMPEG_PATH
 
@@ -19,16 +17,11 @@ if hasattr(settings, 'FFMPEG_PATH') and settings.FFMPEG_PATH != 'ffmpeg':
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
 def upload_audio(request):
-    """
-    POST — recebe o arquivo de áudio (multipart/form-data) e dispara o Celery
-    GET  — retorna status 200 para healthcheck
-    """
     if request.method == 'POST':
         form = AudioUploadForm(request.POST, request.FILES)
         if form.is_valid():
             separation = form.save()
             process_audio_task.delay(separation.id)
-
             return JsonResponse({
                 'success': True,
                 'separation_id': separation.id,
@@ -36,22 +29,46 @@ def upload_audio(request):
                 'status': separation.status,
                 'status_display': separation.get_status_display(),
             }, status=201)
-
-        return JsonResponse({
-            'success': False,
-            'errors': form.errors
-        }, status=400)
-
-    # GET — healthcheck
+        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     return JsonResponse({'status': 'Audio Splitter API online'})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def upload_youtube(request):
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+
+    youtube_url = body.get('youtube_url', '').strip()
+    title = body.get('title', '').strip()
+
+    if not youtube_url:
+        return JsonResponse({'success': False, 'error': 'youtube_url é obrigatório'}, status=400)
+
+    if 'youtube.com' not in youtube_url and 'youtu.be' not in youtube_url:
+        return JsonResponse({'success': False, 'error': 'URL do YouTube inválida'}, status=400)
+
+    separation = AudioSeparation.objects.create(
+        youtube_url=youtube_url,
+        title=title or '',
+        status='PENDING',
+    )
+
+    process_audio_task.delay(separation.id)
+
+    return JsonResponse({
+        'success': True,
+        'separation_id': separation.id,
+        'title': separation.title,
+        'status': separation.status,
+        'status_display': separation.get_status_display(),
+    }, status=201)
 
 
 @require_http_methods(["GET"])
 def check_status(request, separation_id):
-    """
-    GET — retorna o status atual do processamento.
-    Quando COMPLETED, inclui as URLs de cada stem e dos arquivos MIDI.
-    """
     try:
         track = AudioSeparation.objects.get(id=separation_id)
     except AudioSeparation.DoesNotExist:
@@ -65,11 +82,9 @@ def check_status(request, separation_id):
     }
 
     if track.status == 'COMPLETED':
-        base = request.build_absolute_uri('/')[:-1]  # ex: https://api.railway.app
-
+        base = request.build_absolute_uri('/')[:-1]
         def url(field):
             return base + field.url if field else None
-
         data['stems'] = {
             'vocals': url(track.vocals_file),
             'drums':  url(track.drums_file),
@@ -88,10 +103,6 @@ def check_status(request, separation_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def mix_and_download(request, separation_id):
-    """
-    POST — recebe lista de stems via JSON e retorna o arquivo mixado para download.
-    Body: { "tracks": ["drums", "bass", "guitar"] }
-    """
     try:
         track = AudioSeparation.objects.get(id=separation_id)
     except AudioSeparation.DoesNotExist:
@@ -100,7 +111,6 @@ def mix_and_download(request, separation_id):
     if track.status != 'COMPLETED':
         return JsonResponse({'error': 'Processamento ainda não concluído'}, status=400)
 
-    # Aceita tanto JSON quanto form-data
     try:
         body = json.loads(request.body)
         selected_tracks = body.get('tracks', [])
@@ -129,17 +139,14 @@ def mix_and_download(request, separation_id):
     if not mixed_audio:
         return JsonResponse({'error': 'Nenhum arquivo de faixa encontrado'}, status=400)
 
-    # Salva o mix temporariamente e retorna para download
     safe_title = "".join(c for c in track.title if c.isalnum() or c in (' ', '-', '_')).strip()
     output_filename = f"mix_{safe_title or track.id}.mp3"
     output_path = os.path.join(settings.MEDIA_ROOT, 'uploads', output_filename)
-
     mixed_audio.export(output_path, format='mp3', bitrate='192k')
 
-    response = FileResponse(
+    return FileResponse(
         open(output_path, 'rb'),
         as_attachment=True,
         filename=output_filename,
         content_type='audio/mpeg'
     )
-    return response

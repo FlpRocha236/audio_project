@@ -117,3 +117,6 @@ DATABASES = {
         default=config('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3')
     )
 }
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB

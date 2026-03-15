@@ -6,6 +6,6 @@
     "nixpacksConfigPath": "nixpacks.toml"
   },
   "deploy": {
-    "startCommand": "celery -A audio_project worker -l info --pool=solo"
+    "startCommand": "gunicorn audio_project.wsgi:application --bind 0.0.0.0:$PORT"
   }
 }

@@ -5,7 +5,6 @@ from celery import shared_task
 from django.conf import settings
 from .models import AudioSeparation
 
-
 def download_youtube_audio(youtube_url: str, output_path: str) -> str:
     command = [
         sys.executable, "-m", "yt_dlp",
@@ -18,7 +17,6 @@ def download_youtube_audio(youtube_url: str, output_path: str) -> str:
     ]
     subprocess.run(command, check=True)
     return output_path
-
 
 @shared_task
 def process_audio_task(separation_id):
@@ -49,10 +47,14 @@ def process_audio_task(separation_id):
 
         # Usa a API Python do demucs diretamente — evita problemas de PATH
         from demucs.separate import main as demucs_main
+        
+        # --- MODO ECONOMIA DE MEMÓRIA (RAM) PARA O RAILWAY ---
         sys.argv = [
             "demucs",
             "-n", "htdemucs_6s",
             "--out", output_dir,
+            "--segment", "2",  # Corta o processamento em fatias pequenas (Salva muita RAM)
+            "-j", "1",         # Força usar apenas 1 processo/thread
             input_path
         ]
         demucs_main()
@@ -73,5 +75,6 @@ def process_audio_task(separation_id):
     except Exception as e:
         track = AudioSeparation.objects.get(id=separation_id)
         track.status = 'FAILED'
+        track.error_message = str(e) # Salva o erro no banco para o Angular mostrar
         track.save()
         print(f"Erro crítico ao processar o áudio: {e}")

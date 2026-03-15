@@ -66,6 +66,7 @@ tzlocal==5.3.1
 colorama==0.4.6
 dj-database-url==2.3.0
 psycopg2-binary==2.9.10
+demucs
 
 # ── MIDI (basic-pitch) — incompatível com Python 3.13 no momento ──────────────
 # Requer TensorFlow que ainda não suporta Python 3.13 oficialmente.

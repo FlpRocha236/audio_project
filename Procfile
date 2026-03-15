@@ -1,2 +1,1 @@
-web: python manage.py migrate && gunicorn audio_project.wsgi --bind 0.0.0.0:$PORT --timeout 600 --workers 1 --threads 1 --worker-class sync
-worker: celery -A audio_project worker -l info --pool=threads --concurrency=1
+web: bash start.sh

@@ -5,7 +5,6 @@ from decouple import config
 import dj_database_url
 
 # === CORREÇÃO PARA PYTHON 3.13 (audioop) ===
-# Isso resolve o erro ModuleNotFoundError: No module named 'audioop'
 try:
     import audioop
 except ImportError:
@@ -14,14 +13,12 @@ except ImportError:
         sys.modules["audioop"] = audioop
     except ImportError:
         pass
-# ===========================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-key')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-# Aceitar o domínio do Railway e Localhost
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.railway.app').split(',')
 
 INSTALLED_APPS = [
@@ -37,7 +34,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # DEVE ser o primeiro
+    'corsheaders.middleware.CorsMiddleware', # Sempre o primeiro
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -50,21 +47,37 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'audio_project.urls'
 
+# === BLOCO REESTABELECIDO (Resolve o erro admin.E403) ===
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
 WSGI_APPLICATION = 'audio_project.wsgi.application'
 
 # === BANCO DE DADOS (Correção TCP_AOFAILURE) ===
 DATABASES = {
     'default': dj_database_url.config(
-        default=config('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3'),
+        default=config('DATABASE_URL'),
         conn_max_age=600,
         conn_health_checks=True,
     )
 }
 
-# === CORS & SEGURANÇA (Correção Bloqueio Vercel) ===
-CORS_ALLOW_ALL_ORIGINS = True  # Libera geral para teste
+# === CORS & SEGURANÇA ===
+CORS_ALLOW_ALL_ORIGINS = True 
 CORS_ALLOW_CREDENTIALS = True
-
 CSRF_TRUSTED_ORIGINS = [
     'https://audio-splitter-frontend.vercel.app',
     'https://*.railway.app'
@@ -76,18 +89,24 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# === LIMITES DE UPLOAD (50MB) ===
+# === LIMITES E PROXY ===
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
-
-# === CONFIGURAÇÃO DE PROXY RAILWAY ===
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
 # === CELERY & REDIS ===
-CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/0')
+# Pega a URL do Redis das variáveis de ambiente do Railway
+redis_url = config('REDIS_URL', default=None)
 
+if redis_url:
+    # Garante que o Celery use a URL capturada
+    CELERY_BROKER_URL = redis_url
+    CELERY_RESULT_BACKEND = redis_url
+else:
+    # Opcional: Caso o Redis não esteja configurado (evita que o app quebre no build)
+    CELERY_BROKER_URL = None
+    CELERY_RESULT_BACKEND = None
+    
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

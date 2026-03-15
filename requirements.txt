@@ -32,3 +32,5 @@ numpy
 sympy
 networkx
 PyYAML
+
+dj-database-url==2.3.0

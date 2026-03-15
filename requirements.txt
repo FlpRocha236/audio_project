@@ -19,8 +19,8 @@ yt-dlp
 
 # AI
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.6.0+cpu
-torchaudio==2.6.0+cpu
+torch
+torchaudio
 demucs
 tqdm
 einops

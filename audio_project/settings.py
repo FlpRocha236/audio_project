@@ -108,5 +108,10 @@ else:
     # Opcional: Caso o Redis não esteja configurado (evita que o app quebre no build)
     CELERY_BROKER_URL = None
     CELERY_RESULT_BACKEND = None
-    
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Force o Django a não redirecionar e quebrar o CORS
+APPEND_SLASH = False
+# Garanta que o CORS aceite qualquer origem para teste absoluto
+CORS_ALLOW_ALL_ORIGINS = True

@@ -1,2 +1,2 @@
-web: python manage.py migrate && gunicorn audio_project.wsgi --bind 0.0.0.0:$PORT --timeout 300 --workers 1 --threads 8 --worker-class gthread
+web: python manage.py migrate && gunicorn audio_project.wsgi --bind 0.0.0.0:$PORT --timeout 600 --workers 1 --threads 4 --worker-class gthread --limit-request-line 8190 --limit-request-field_size 16380
 worker: celery -A audio_project worker -l info --pool=threads --concurrency=1

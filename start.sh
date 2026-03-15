@@ -1,4 +1,0 @@
-#!/bin/bash
-python manage.py migrate
-celery -A audio_project worker -l info --pool=solo &
-gunicorn audio_project.wsgi --bind 0.0.0.0:$PORT --timeout 120

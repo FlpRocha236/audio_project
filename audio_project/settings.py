@@ -33,13 +33,13 @@ INSTALLED_APPS = [
     'separator',
 ]
 
+# === MIDDLEWARE (Com as vírgulas rigorosamente corretas) ===
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # Sempre o primeiro
-    'django.middleware.common.CommonMiddleware'
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -48,7 +48,6 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'audio_project.urls'
 
-# === BLOCO REESTABELECIDO (Resolve o erro admin.E403) ===
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -67,10 +66,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'audio_project.wsgi.application'
 
-# === BANCO DE DADOS (Correção TCP_AOFAILURE) ===
+# === BANCO DE DADOS ===
 DATABASES = {
     'default': dj_database_url.config(
-        default=config('DATABASE_URL'),
+        default=config('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3'),
         conn_max_age=600,
         conn_health_checks=True,
     )
@@ -79,6 +78,8 @@ DATABASES = {
 # === CORS & SEGURANÇA ===
 CORS_ALLOW_ALL_ORIGINS = True 
 CORS_ALLOW_CREDENTIALS = True
+APPEND_SLASH = False  # Evita o redirecionamento que quebra o CORS
+
 CSRF_TRUSTED_ORIGINS = [
     'https://audio-splitter-frontend.vercel.app',
     'https://*.railway.app'
@@ -87,6 +88,8 @@ CSRF_TRUSTED_ORIGINS = [
 # === ARQUIVOS ESTÁTICOS E MÍDIA ===
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+os.makedirs(STATIC_ROOT, exist_ok=True) # Impede o aviso/erro do WhiteNoise
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -98,21 +101,9 @@ USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
 # === CELERY & REDIS ===
-# Pega a URL do Redis das variáveis de ambiente do Railway
-redis_url = config('REDIS_URL', default=None)
-
+redis_url = config('REDIS_URL', default='')
 if redis_url:
-    # Garante que o Celery use a URL capturada
     CELERY_BROKER_URL = redis_url
     CELERY_RESULT_BACKEND = redis_url
-else:
-    # Opcional: Caso o Redis não esteja configurado (evita que o app quebre no build)
-    CELERY_BROKER_URL = None
-    CELERY_RESULT_BACKEND = None
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Force o Django a não redirecionar e quebrar o CORS
-APPEND_SLASH = False
-# Garanta que o CORS aceite qualquer origem para teste absoluto
-CORS_ALLOW_ALL_ORIGINS = True

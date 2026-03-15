@@ -1,6 +1,5 @@
 from django.db import models
 
-
 class AudioSeparation(models.Model):
     STATUS_CHOICES = [
         ('PENDING',    'Pendente'),
@@ -9,18 +8,21 @@ class AudioSeparation(models.Model):
         ('FAILED',     'Erro'),
     ]
 
-    # Dados de entrada
+    # Dados de entrada (Vírgula adicionada no original_audio)
     title          = models.CharField(max_length=255, blank=True, verbose_name="Título da Música")
-    original_audio = models.FileField(upload_to='uploads/originals/', blank=True, null=True, verbose_name="Arquivo de Áudio")
+    original_audio = models.FileField(upload_to='uploads/originals/', blank=True, null=True, verbose_name="Arquivo de Áudio", max_length=500)
     youtube_url    = models.URLField(max_length=500, blank=True, null=True, verbose_name="Link do YouTube")
 
-    # Stems gerados pelo Demucs
-    vocals_file = models.FileField(upload_to='uploads/separated/', blank=True, null=True)
-    drums_file  = models.FileField(upload_to='uploads/separated/', blank=True, null=True)
-    bass_file   = models.FileField(upload_to='uploads/separated/', blank=True, null=True)
-    guitar_file = models.FileField(upload_to='uploads/separated/', blank=True, null=True)
-    piano_file  = models.FileField(upload_to='uploads/separated/', blank=True, null=True)
-    other_file  = models.FileField(upload_to='uploads/separated/', blank=True, null=True)
+    # Stems gerados pelo Demucs (max_length=500 adicionado em TODOS)
+    vocals_file = models.FileField(upload_to='uploads/separated/', blank=True, null=True, max_length=500)
+    drums_file  = models.FileField(upload_to='uploads/separated/', blank=True, null=True, max_length=500)
+    bass_file   = models.FileField(upload_to='uploads/separated/', blank=True, null=True, max_length=500)
+    guitar_file = models.FileField(upload_to='uploads/separated/', blank=True, null=True, max_length=500)
+    piano_file  = models.FileField(upload_to='uploads/separated/', blank=True, null=True, max_length=500)
+    other_file  = models.FileField(upload_to='uploads/separated/', blank=True, null=True, max_length=500)
+
+    # Campo para guardar erros pro seu Frontend mostrar (opcional, mas recomendado)
+    error_message = models.TextField(blank=True, null=True)
 
     # Controle de estado
     status     = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')

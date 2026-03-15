@@ -77,7 +77,7 @@ DATABASES = {
 
 # === CORS & SEGURANÇA ===
 CORS_ALLOW_ALL_ORIGINS = True 
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = False
 APPEND_SLASH = False  # Evita o redirecionamento que quebra o CORS
 
 CSRF_TRUSTED_ORIGINS = [
@@ -92,6 +92,7 @@ os.makedirs(STATIC_ROOT, exist_ok=True) # Impede o aviso/erro do WhiteNoise
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 # === LIMITES E PROXY ===
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800

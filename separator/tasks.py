@@ -13,6 +13,7 @@ def download_youtube_audio(youtube_url: str, output_path: str) -> str:
         "--audio-quality", "0",
         "--output", output_path,
         "--no-playlist",
+        "--extractor-args", "youtube:player_client=android", # Bypass para o bloqueio de bot do YouTube
         youtube_url,
     ]
     subprocess.run(command, check=True)

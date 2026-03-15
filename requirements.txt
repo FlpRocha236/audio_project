@@ -37,5 +37,3 @@ dj-database-url==2.3.0
 psycopg2-binary==2.9.10
 
 audioop-lts
-DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB

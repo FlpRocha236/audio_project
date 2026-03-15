@@ -89,10 +89,16 @@ if FFMPEG_PATH != 'ffmpeg':
     os.environ['PATH'] += os.pathsep + os.path.dirname(FFMPEG_PATH)
 
 # ── Celery ─────────────────────────────────────────────────────────────────────
-CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/0')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
+redis_url = os.getenv("REDIS_URL")
+
+if redis_url and not redis_url.endswith("/0"):
+    redis_url = f"{redis_url}/0"
+
+CELERY_BROKER_URL = redis_url
+CELERY_RESULT_BACKEND = redis_url
+
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
 
 # ── Validação de senha ────────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [

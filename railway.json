@@ -6,6 +6,6 @@
     "nixpacksConfigPath": "nixpacks.toml"
   },
   "deploy": {
-    "gunicorn audio_project.wsgi:application --bind 0.0.0.0:$PORTT"
+    "startCommand": "gunicorn audio_project.wsgi:application --bind 0.0.0.0:$PORT"
   }
 }

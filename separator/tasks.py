@@ -49,13 +49,14 @@ def process_audio_task(separation_id):
         # Usa a API Python do demucs diretamente — evita problemas de PATH
         from demucs.separate import main as demucs_main
         
-        # --- MODO ECONOMIA DE MEMÓRIA (RAM) PARA O RAILWAY ---
+        # --- MODO SOBREVIVÊNCIA PARA GUITARRISTAS (6 FAIXAS, MÍNIMO DE RAM) ---
         sys.argv = [
             "demucs",
-            "-n", "htdemucs_6s",
+            "-n", "htdemucs_6s",  # OBRIGATÓRIO manter este para ter a Guitarra
             "--out", output_dir,
-            "--segment", "2",  # Corta o processamento em fatias pequenas (Salva muita RAM)
-            "-j", "1",         # Força usar apenas 1 processo/thread
+            "--segment", "1",     # Fatias minúsculas de 1 segundo (Lento, mas salva muita RAM)
+            "--overlap", "0.1",   # Reduz a sobreposição na memória
+            "-j", "1",            # Força usar apenas 1 processo/thread
             input_path
         ]
         demucs_main()

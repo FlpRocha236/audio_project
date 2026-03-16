@@ -3,6 +3,10 @@ import sys
 from pathlib import Path
 from decouple import config
 import dj_database_url
+from dotenv import load_dotenv
+
+# 1. CARREGA O .ENV ANTES DE TUDO! (A Mágica acontece aqui)
+load_dotenv()
 
 # === CORREÇÃO PARA PYTHON 3.13 (audioop) ===
 try:
@@ -19,7 +23,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-key')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.railway.app').split(',')
+# Lendo do .env e liberando geral com o '*' para o Ngrok funcionar
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -33,7 +38,7 @@ INSTALLED_APPS = [
     'separator',
 ]
 
-# === MIDDLEWARE (Com as vírgulas rigorosamente corretas) ===
+# === MIDDLEWARE ===
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -67,9 +72,10 @@ TEMPLATES = [
 WSGI_APPLICATION = 'audio_project.wsgi.application'
 
 # === BANCO DE DADOS ===
+# Agora ele tem a URL porque o load_dotenv() rodou lá em cima
 DATABASES = {
     'default': dj_database_url.config(
-        default=config('DATABASE_URL', default=f'sqlite:///{BASE_DIR}/db.sqlite3'),
+        default=os.environ.get('DATABASE_URL'),
         conn_max_age=600,
         conn_health_checks=True,
     )
@@ -80,15 +86,31 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = False
 APPEND_SLASH = False  # Evita o redirecionamento que quebra o CORS
 
+# 🔑 A LIBERAÇÃO DA CARTEIRADA
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'ngrok-skip-browser-warning',
+]
+
+# Removido o Railway e adicionado os domínios do Ngrok
 CSRF_TRUSTED_ORIGINS = [
     'https://audio-splitter-frontend.vercel.app',
-    'https://*.railway.app'
+    'https://*.ngrok-free.dev',
+    'https://*.ngrok-free.app',
 ]
 
 # === ARQUIVOS ESTÁTICOS E MÍDIA ===
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-os.makedirs(STATIC_ROOT, exist_ok=True) # Impede o aviso/erro do WhiteNoise
+os.makedirs(STATIC_ROOT, exist_ok=True) 
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -102,9 +124,7 @@ USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
 # === CELERY & REDIS ===
-redis_url = config('REDIS_URL', default='')
-if redis_url:
-    CELERY_BROKER_URL = redis_url
-    CELERY_RESULT_BACKEND = redis_url
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
